@@ -1,5 +1,7 @@
 package com.smart_team.model;
 
+import java.util.Map;
+
 public class User {
 
     private String authToken;
@@ -8,6 +10,7 @@ public class User {
     private String name;
     private String email;
     private String picture;
+    private Map<String,String> friends;
 
     public User(String authToken, String ID, String appID, String name, String email, String picture) {
         this.authToken = authToken;
@@ -73,6 +76,14 @@ public class User {
 
     public void setPicture(String picture) {
         this.picture = picture;
+    }
+
+    public Map<String, String> getFriends() {
+        return friends;
+    }
+
+    public void setFriends(Map<String, String> friends) {
+        this.friends = friends;
     }
 
 }
