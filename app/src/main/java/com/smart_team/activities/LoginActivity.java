@@ -11,14 +11,13 @@ import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
 import com.facebook.GraphRequest;
-import com.facebook.GraphRequestAsyncTask;
 import com.facebook.GraphResponse;
-import com.facebook.HttpMethod;
-import com.facebook.internal.Utility;
+import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
 
-import com.smart_team.model.SharedPreferencesManager;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smart_team.model.Friend;
 import com.smart_team.model.User;
 import com.smart_team.smartteam.R;
 
@@ -26,23 +25,19 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
-import io.realm.internal.Util;
+import io.realm.Realm;
+import io.realm.RealmConfiguration;
+import io.realm.RealmList;
 
 public class LoginActivity extends Activity {
 
     private LoginButton loginButton;
     private CallbackManager callbackManager;
-    private User user;
-    private SharedPreferencesManager preferences;
-
-    String auth,id,appID,name,mail,pic;
+    private Realm realm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,9 +46,6 @@ public class LoginActivity extends Activity {
         FacebookSdk.sdkInitialize(this.getApplicationContext());
 
         setContentView(R.layout.activity_login);
-
-        // Instance of SharedPreferencesManager
-        preferences = new SharedPreferencesManager(this);
 
         // Facebook Login button
         loginButton = (LoginButton) findViewById(R.id.login_button);
@@ -65,7 +57,7 @@ public class LoginActivity extends Activity {
         // CallbackManager of the Login
         callbackManager = CallbackManager.Factory.create();
 
-        //user = new User();
+        LoginManager.getInstance().logInWithReadPermissions(LoginActivity.this, Arrays.asList("public_profile","user_friends","email"));
 
         // Callback registration
         loginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
@@ -73,13 +65,18 @@ public class LoginActivity extends Activity {
             @Override
             public void onSuccess(LoginResult loginResult) {
 
-                auth = loginResult.getAccessToken().getToken();
-                appID = loginResult.getAccessToken().getApplicationId();
+                Realm.setDefaultConfiguration(new RealmConfiguration.Builder(getApplicationContext()).build());
 
-                preferences.setAuthToken(auth);
-                preferences.setAppID(appID);
+                // Get a Realm instance for this thread
+                realm = Realm.getDefaultInstance();
+                realm.beginTransaction();
 
-                Map<String, String> friends = new HashMap<>();
+                final User user = realm.createObject(User.class);
+                realm.copyToRealm(user);
+
+                user.setAuthToken(loginResult.getAccessToken().getToken());
+                user.setAppID(loginResult.getAccessToken().getApplicationId());
+                realm.commitTransaction();
 
                 GraphRequest request = GraphRequest.newMeRequest(
                         AccessToken.getCurrentAccessToken(),
@@ -88,31 +85,16 @@ public class LoginActivity extends Activity {
                             public void onCompleted(final JSONObject object, GraphResponse response) {
                                 final JSONObject jsonObject = response.getJSONObject();
                                 try {
-                                    id = object.getString("id");
-                                    preferences.setID(id);
+                                    String id = object.getString("id");
+                                    String name = object.getString("name");
+                                    String mail = object.getString("email");
 
-                                    try {
-                                        URL profile_pic = new URL("https://graph.facebook.com/" + id + "/picture?width=200&height=150");
-                                        pic = profile_pic.toString();
-                                        preferences.setPictureURI(pic);
+                                    realm.beginTransaction();
+                                    user.setID(id);
+                                    user.setName(name);
+                                    user.setEmail(mail);
 
-                                    } catch (MalformedURLException e) {
-                                        e.printStackTrace();
-                                    }
-
-                                    name = object.getString("name");
-                                    preferences.setMail(name);
-
-                                    mail = object.getString("email");
-                                    preferences.setMail(mail);
-
-                                    JSONObject friends = jsonObject.getJSONObject("friends");
-                                    JSONArray data = friends.getJSONArray("data");
-
-                                    // Try with first friend
-                                    JSONObject objectdata = data.getJSONObject(0);
-
-                                    friends.put(objectdata.getString("id"), objectdata.getString("name"));
+                                    realm.commitTransaction();
 
                                 } catch (JSONException e) {
                                     e.printStackTrace();
@@ -123,29 +105,37 @@ public class LoginActivity extends Activity {
                 parameters.putString("fields", "id, name, email");
                 request.setParameters(parameters);
                 request.executeAsync();
-/*
-                GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
+
+                GraphRequest friend_request = GraphRequest.newMyFriendsRequest(
                         AccessToken.getCurrentAccessToken(),
-                        "/me/friends",
-                        null,
-                        HttpMethod.GET,
-                        new GraphRequest.Callback() {
-                            public void onCompleted(GraphResponse response) {
-                                // Parsare la lista ed aggiungerla in preferences
-                                JSONObject json = new JSONObject(response);
-                                JSONArray friendsData = json.getJSONArray("data");
+                        new GraphRequest.GraphJSONArrayCallback() {
+                            @Override
+                            public void onCompleted(JSONArray objects, GraphResponse response) {
 
-                                ArrayList<String> ids = new ArrayList<String>();
-                                ArrayList<String> names = new ArrayList<String>();
+                                ObjectMapper objectMapper = new ObjectMapper();
+                                ;
+                                RealmList<Friend> realm_friends = new RealmList<>();
+                                realm.copyToRealm(realm_friends);
 
-                                for(int i = 0; i < friendsData.length(); i++){
-                                    ids.add(friendsData.getJSONObject(i).getString("id"));
-                                    names.add(friendsData.getJSONObject(i).getString("name"));
+                                try {
+                                    realm.beginTransaction();
+                                    List<Friend> friends = objectMapper
+                                            .readValue(objects.toString(),
+                                                    objectMapper.getTypeFactory().constructCollectionType(List.class, Friend.class));
+                                    realm_friends.addAll(friends);
+                                    realm.commitTransaction();
+                                } catch(IOException e) {
+                                    e.printStackTrace();
                                 }
-
-
+                                realm.beginTransaction();
+                                user.setFriends(realm_friends);
+                                realm.commitTransaction();
                             }
-                        }).executeAsync(); */
+                        });
+                Bundle param = new Bundle();
+                param.putString("fields", "id, name");
+                request.setParameters(param);
+                request.executeAsync();
 
                 Intent i = new Intent(LoginActivity.this, MainActivity.class);
                 startActivity(i);
@@ -172,10 +162,6 @@ public class LoginActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         callbackManager.onActivityResult(requestCode, resultCode, data);
-
-        if (callbackManager.onActivityResult(requestCode, resultCode, data)) {
-            return;
-        }
     }
 
 }

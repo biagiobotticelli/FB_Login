@@ -10,9 +10,13 @@ import com.facebook.AccessTokenTracker;
 import com.facebook.FacebookSdk;
 import com.smart_team.smartteam.R;
 
+import io.realm.Realm;
+import io.realm.RealmConfiguration;
+
 public class LogoActivity extends Activity {
 
     AccessTokenTracker accessTokenTracker;
+    private Realm realm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,6 +28,8 @@ public class LogoActivity extends Activity {
         accessTokenTracker = new AccessTokenTracker() {
             @Override
             protected void onCurrentAccessTokenChanged(AccessToken oldAccessToken, AccessToken newAccessToken) {
+                Realm.setDefaultConfiguration(new RealmConfiguration.Builder(getApplicationContext()).build());
+                realm = Realm.getDefaultInstance();
                 updateWithToken(newAccessToken);
             }
         };

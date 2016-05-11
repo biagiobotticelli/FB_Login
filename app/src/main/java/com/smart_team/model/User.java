@@ -1,33 +1,34 @@
 package com.smart_team.model;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 
-public class User {
+import io.realm.RealmList;
+import io.realm.RealmObject;
+import io.realm.annotations.PrimaryKey;
+
+public class User extends RealmObject {
+
+    @PrimaryKey
+    private String ID;
 
     private String authToken;
-    private String ID;
     private String appID;
     private String name;
     private String email;
-    private String picture;
-    private Map<String,String> friends;
+    private RealmList<Friend> friends;
 
-    public User(String authToken, String ID, String appID, String name, String email, String picture) {
+    public User(String authToken, String ID, String appID, String name, String email, RealmList<Friend> friends) {
         this.authToken = authToken;
         this.ID = ID;
         this.appID = appID;
         this.name = name;
         this.email = email;
-        this.picture = picture;
+        this.friends = friends;
     }
 
     public User() {
-        this.authToken = "";
-        this.ID = "";
-        this.appID = "";
-        this.name = "";
-        this.email = "";
-        this.picture = "";
     }
 
     public String getAuthToken() {
@@ -70,19 +71,11 @@ public class User {
         this.email = email;
     }
 
-    public String getPicture() {
-        return picture;
-    }
-
-    public void setPicture(String picture) {
-        this.picture = picture;
-    }
-
-    public Map<String, String> getFriends() {
+    public RealmList<Friend> getFriends() {
         return friends;
     }
 
-    public void setFriends(Map<String, String> friends) {
+    public void setFriends(RealmList<Friend> friends) {
         this.friends = friends;
     }
 

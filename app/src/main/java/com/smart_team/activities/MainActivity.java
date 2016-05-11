@@ -1,15 +1,13 @@
 package com.smart_team.activities;
 
 import android.content.Intent;
-import android.graphics.drawable.Drawable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.ArrayAdapter;
-import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import com.smart_team.model.SharedPreferencesManager;
+import com.facebook.CallbackManager;
 import com.smart_team.model.User;
 import com.smart_team.smartteam.R;
 
@@ -19,24 +17,25 @@ import org.json.JSONException;
 import java.util.ArrayList;
 
 import io.realm.Realm;
-import io.realm.RealmConfiguration;
 
 public class MainActivity extends AppCompatActivity {
 
-    //private Realm realm;
-    private SharedPreferencesManager preferences;
+    private User user;
+    private Realm realm;
+    private CallbackManager callbackManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Instance of SharedPreferencesManager
-        preferences = new SharedPreferencesManager(this);
+        // CallbackManager of the Login
+        callbackManager = CallbackManager.Factory.create();
 
-        /*
-        RealmConfiguration realmConfiguration = new RealmConfiguration.Builder(this).build();
-        Realm.setDefaultConfiguration(realmConfiguration);
-        */
+        // Get a Realm instance for this thread
+        realm = Realm.getDefaultInstance();
+        realm.beginTransaction();
+
+        user = realm.where(User.class).findFirst();
 
         setContentView(R.layout.activity_main);
 
@@ -45,45 +44,31 @@ public class MainActivity extends AppCompatActivity {
         TextView appId = (TextView)findViewById(R.id.appId);
         TextView name = (TextView)findViewById(R.id.name);
         TextView mail = (TextView)findViewById(R.id.mail);
+        TextView friend_ID = (TextView)findViewById(R.id.friend_ID);
+        TextView friend_name = (TextView)findViewById(R.id.friend_name);
 
-        /*
-        Intent i = getIntent();
-        String authToken = i.getStringExtra("authToken");
-        realm = Realm.getDefaultInstance();
-        User user = realm.where(User.class).equalTo("authToken", authToken).findFirst();
-        */
+        auth.setText("authToken = "+user.getAuthToken());
+        id.setText("ID = "+user.getID());
+        appId.setText("AppID = "+user.getAppID());
+        name.setText("Name = "+user.getName());
+        mail.setText("Mail = "+user.getEmail());
 
-        auth.setText("authToken = "+preferences.getAuthToken());
-        id.setText("ID = "+preferences.getID());
-        appId.setText("AppID = "+preferences.getAppID());
-        name.setText("Name = "+preferences.getName());
-        mail.setText("Mail = "+preferences.getMail());
 
-        Intent intent = getIntent();
-        String jsondata = intent.getStringExtra("jsondata");
-
-        JSONArray friendslist;
-        ArrayList<String> friends = new ArrayList<String>();
-        try {
-            friendslist = new JSONArray(jsondata);
-            for (int l=0; l < friendslist.length(); l++) {
-                friends.add(friendslist.getJSONObject(l).getString("name"));
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
+        if(!user.getFriends().isEmpty()) {
+            friend_ID.setText("FRIEND: ID = " + user.getFriends().first().getID());
+            friend_name.setText("FRIEND: Name = " + user.getFriends().first().getName());
         }
 
-        ArrayAdapter adapter = new ArrayAdapter<String>(this, R.layout.activity_listview, friends);
-        ListView listView = (ListView) findViewById(R.id.listView);
-        listView.setAdapter(adapter);
+        realm.commitTransaction();
 
-        //realm.close();
+        realm.close();
 
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        //realm.close();
+        realm.close();
     }
+
 }
