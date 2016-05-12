@@ -1,8 +1,5 @@
 package com.smart_team.model;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 import io.realm.RealmList;
 import io.realm.RealmObject;
@@ -16,15 +13,22 @@ public class User extends RealmObject {
     private String authToken;
     private String appID;
     private String name;
+    private String surname;
     private String email;
+    private Double latGPS;
+    private Double lonGPS;
     private RealmList<Friend> friends;
+    private String rest;
 
-    public User(String authToken, String ID, String appID, String name, String email, RealmList<Friend> friends) {
+    public User(String authToken, String ID, String appID, String name, String surname, String email, Double latGPS, Double lonGPS, RealmList<Friend> friends) {
         this.authToken = authToken;
         this.ID = ID;
         this.appID = appID;
         this.name = name;
+        this.surname = surname;
         this.email = email;
+        this.latGPS = latGPS;
+        this.lonGPS = lonGPS;
         this.friends = friends;
     }
 
@@ -63,6 +67,14 @@ public class User extends RealmObject {
         this.name = name;
     }
 
+    public String getSurname() {
+        return surname;
+    }
+
+    public void setSurname(String surname) {
+        this.surname = surname;
+    }
+
     public String getEmail() {
         return email;
     }
@@ -79,4 +91,27 @@ public class User extends RealmObject {
         this.friends = friends;
     }
 
+    public Double getLatGPS() {
+        return latGPS;
+    }
+
+    public void setLatGPS(Double latGPS) {
+        this.latGPS = latGPS;
+    }
+
+    public Double getLonGPS() {
+        return lonGPS;
+    }
+
+    public void setLonGPS(Double lonGPS) {
+        this.lonGPS = lonGPS;
+    }
+
+    public String getRest() {
+        return rest;
+    }
+
+    public void setRest(String rest) {
+        this.rest = rest;
+    }
 }
