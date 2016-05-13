@@ -149,6 +149,7 @@ public class LoginActivity extends Activity {
                                         friend.setID(id);
                                         friend.setName(name);
                                         realm_friends.add(friend);
+                                        //
                                     }
                                     realm.commitTransaction();
 
