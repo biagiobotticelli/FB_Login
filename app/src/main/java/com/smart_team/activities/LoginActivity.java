@@ -14,7 +14,9 @@ import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
 import com.facebook.GraphRequest;
+import com.facebook.GraphRequestAsyncTask;
 import com.facebook.GraphResponse;
+import com.facebook.HttpMethod;
 import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
@@ -34,6 +36,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -45,6 +48,7 @@ public class LoginActivity extends Activity {
 
     private CallbackManager callbackManager;
     private Realm realm;
+    private User user;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,14 +76,13 @@ public class LoginActivity extends Activity {
             @Override
             public void onSuccess(LoginResult loginResult) {
 
-                final User user = realm.createObject(User.class);
-
                 Realm.setDefaultConfiguration(new RealmConfiguration.Builder(getApplicationContext()).build());
 
                 // Get a Realm instance for this thread
                 realm = Realm.getDefaultInstance();
-                realm.beginTransaction();
 
+                realm.beginTransaction();
+                user = realm.createObject(User.class);
                 realm.copyToRealm(user);
 
                 user.setAuthToken(loginResult.getAccessToken().getToken());
@@ -114,38 +117,48 @@ public class LoginActivity extends Activity {
                 request.setParameters(parameters);
                 request.executeAsync();
 
-                GraphRequest friend_request = GraphRequest.newMyFriendsRequest(
-                        AccessToken.getCurrentAccessToken(),
-                        new GraphRequest.GraphJSONArrayCallback() {
-                            @Override
-                            public void onCompleted(JSONArray objects, GraphResponse response) {
-
-                                ObjectMapper objectMapper = new ObjectMapper();
-
-                                RealmList<Friend> realm_friends = new RealmList<>();
-                                realm.copyToRealm(realm_friends);
-
+                GraphRequestAsyncTask friend_request = new GraphRequest(
+                        loginResult.getAccessToken(),
+                        "/me/friends",
+                        null,
+                        HttpMethod.GET,
+                        new GraphRequest.Callback() {
+                            public void onCompleted(GraphResponse response) {
                                 try {
+                                    JSONArray friendslist = response.getJSONObject().getJSONArray("data");
+                                    ArrayList<String> friends_ids = new ArrayList<String>();
+                                    ArrayList<String> friends_names = new ArrayList<String>();
+                                    try {
+                                        for (int f=0; f < friendslist.length(); f++) {
+                                            friends_ids.add(friendslist.getJSONObject(f).getString("id"));
+                                            friends_names.add(friendslist.getJSONObject(f).getString("name"));
+                                        }
+                                    } catch (JSONException e) {
+                                        e.printStackTrace();
+                                    }
+
                                     realm.beginTransaction();
-                                    List<Friend> friends = objectMapper
-                                            .readValue(objects.toString(),
-                                                    objectMapper.getTypeFactory().constructCollectionType(List.class, Friend.class));
-                                    realm_friends.addAll(friends);
+                                    RealmList<Friend> realm_friends = new RealmList<>();
+                                    realm.copyToRealm(realm_friends);
+
+                                    Friend friend = new Friend();
+
+                                    for(int i=0; i<friends_ids.size(); i++) {
+                                        String id = friends_ids.get(i);
+                                        String name = friends_names.get(i);
+                                        friend.setID(id);
+                                        friend.setName(name);
+                                        realm_friends.add(friend);
+                                    }
                                     realm.commitTransaction();
-                                } catch(IOException e) {
+
+                                } catch (JSONException e) {
                                     e.printStackTrace();
                                 }
-                                realm.beginTransaction();
-                                user.setFriends(realm_friends);
-                                realm.commitTransaction();
                             }
-                        });
-                Bundle param = new Bundle();
-                param.putString("fields", "id, name");
-                friend_request.setParameters(param);
-                friend_request.executeAsync();
+                        }).executeAsync();
 
-                new HttpRequestTask().execute();
+                //new HttpRequestTask().execute();
 
                 Intent i = new Intent(LoginActivity.this, MainActivity.class);
                 startActivity(i);
@@ -181,7 +194,7 @@ public class LoginActivity extends Activity {
                 realm = Realm.getDefaultInstance();
                 User user = realm.where(User.class).findFirst();
 
-                final String url = "http://192.168.43.251:8080/user?token="+ user.getAuthToken();
+                final String url = "http://amaca.ga:8080/user?token="+ user.getAuthToken();
 
                 RestTemplate restTemplate = new RestTemplate();
                 restTemplate.getMessageConverters().add(new MappingJackson2HttpMessageConverter());
