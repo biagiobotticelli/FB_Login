@@ -8,8 +8,8 @@ import io.realm.annotations.PrimaryKey;
 public class User extends RealmObject {
 
     @PrimaryKey
-    private String ID;
-
+    private String serverID;
+    private String facebookID;
     private String authToken;
     private String appID;
     private String name;
@@ -20,9 +20,10 @@ public class User extends RealmObject {
     private RealmList<Friend> friends;
     private String rest;
 
-    public User(String authToken, String ID, String appID, String name, String surname, String email, Double latGPS, Double lonGPS, RealmList<Friend> friends) {
+    public User(String serverID, String authToken, String facebookID, String appID, String name, String surname, String email, Double latGPS, Double lonGPS, RealmList<Friend> friends) {
+        this.serverID = serverID;
         this.authToken = authToken;
-        this.ID = ID;
+        this.facebookID = facebookID;
         this.appID = appID;
         this.name = name;
         this.surname = surname;
@@ -35,6 +36,14 @@ public class User extends RealmObject {
     public User() {
     }
 
+    public String getServerID() {
+        return serverID;
+    }
+
+    public void setServerID(String serverID) {
+        this.serverID = serverID;
+    }
+
     public String getAuthToken() {
         return authToken;
     }
@@ -43,12 +52,12 @@ public class User extends RealmObject {
         this.authToken = authToken;
     }
 
-    public String getID() {
-        return ID;
+    public String getFacebookID() {
+        return facebookID;
     }
 
-    public void setID(String ID) {
-        this.ID = ID;
+    public void setFacebookID(String ID) {
+        this.facebookID = facebookID;
     }
 
     public String getAppID() {
@@ -114,4 +123,17 @@ public class User extends RealmObject {
     public void setRest(String rest) {
         this.rest = rest;
     }
+
+    @Override
+    public String toString() {
+        String s = "LOGGED USER \n";
+        s += "Server ID = \t\t"+ this.getServerID();
+        s += "Facebook ID = \t\t"+ this.getFacebookID();
+        s += "Email = \t\t"+ this.getEmail();
+        s += "Name = \t\t"+ this.getName();
+        s += "Surname = \t\t"+ this.getSurname()+ "\n";
+
+        return s;
+    }
+
 }

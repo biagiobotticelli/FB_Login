@@ -44,27 +44,29 @@ public class MainActivity extends AppCompatActivity {
         TextView mail = (TextView)findViewById(R.id.mail);
         TextView friend_ID = (TextView)findViewById(R.id.friend_ID);
         TextView friend_name = (TextView)findViewById(R.id.friend_name);
+        TextView friend_surname = (TextView)findViewById(R.id.friend_surname);
         TextView rest = (TextView)findViewById(R.id.rest);
 
-        auth.setText("authToken = "+user.getAuthToken());
-        id.setText("ID = "+user.getID());
-        appId.setText("AppID = "+user.getAppID());
-        name.setText("Name = "+user.getName());
-        surname.setText("Surname = "+user.getSurname());
-        mail.setText("Mail = "+user.getEmail());
+
+        auth.setText("authToken = " + user.getAuthToken());
+        id.setText("Facebook ID = " + user.getFacebookID());
+        appId.setText("AppID = " + user.getAppID());
+        name.setText("Name = " + user.getName());
+        surname.setText("Surname = " + user.getSurname());
+        mail.setText("Mail = " + user.getEmail());
+
 
         if(!user.getFriends().isEmpty()) {
             friend_ID.setText("FRIEND: ID = " + user.getFriends().first().getID());
             friend_name.setText("FRIEND: Name = " + user.getFriends().first().getName());
+            friend_surname.setText("FRIEND: Surname = " + user.getFriends().first().getSurname());
         }
 
-        rest.setText("REST = "+user.getRest());
+        rest.setText("REST Response = "+user.getRest());
 
         realm.commitTransaction();
 
         realm.close();
-
-        new HttpRequestTask().execute();
 
     }
 
@@ -72,33 +74,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         realm.close();
-    }
-
-    private class HttpRequestTask extends AsyncTask<Void, Void, String> {
-        @Override
-        protected String doInBackground(Void... params) {
-            try {
-                final String url = "http://192.168.43.251:8080/beacon";
-
-                RestTemplate restTemplate = new RestTemplate();
-                restTemplate.getMessageConverters().add(new MappingJackson2HttpMessageConverter());
-
-                String response = restTemplate.getForObject(url, String.class);
-
-                return response;
-
-            } catch (Exception e) {
-                Log.e("MainActivity", e.getMessage(), e);
-            }
-
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-            TextView restView = (TextView) findViewById(R.id.rest);
-            restView.setText(result);
-        }
     }
 
 }

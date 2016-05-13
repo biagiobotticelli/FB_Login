@@ -66,6 +66,13 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:id="@+id/friend_surname"
+        android:layout_margin="12dp"
+        />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:id="@+id/rest"
         android:layout_margin="12dp"
         />

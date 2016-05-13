@@ -2,11 +2,9 @@ package com.smart_team.activities;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.TextView;
 
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
@@ -14,15 +12,11 @@ import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
 import com.facebook.GraphRequest;
-import com.facebook.GraphRequestAsyncTask;
 import com.facebook.GraphResponse;
-import com.facebook.HttpMethod;
 import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
 
-import com.fasterxml.jackson.core.sym.Name;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smart_team.model.Friend;
 import com.smart_team.model.User;
 import com.smart_team.smartteam.R;
@@ -30,15 +24,13 @@ import com.smart_team.smartteam.R;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.net.URI;
 
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
@@ -49,6 +41,8 @@ public class LoginActivity extends Activity {
     private CallbackManager callbackManager;
     private Realm realm;
     private User user;
+    private String authToken;
+    private String serverID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,7 +79,9 @@ public class LoginActivity extends Activity {
                 user = realm.createObject(User.class);
                 realm.copyToRealm(user);
 
-                user.setAuthToken(loginResult.getAccessToken().getToken());
+                authToken = loginResult.getAccessToken().getToken();
+
+                user.setAuthToken(authToken);
                 user.setAppID(loginResult.getAccessToken().getApplicationId());
                 realm.commitTransaction();
 
@@ -95,13 +91,13 @@ public class LoginActivity extends Activity {
                             @Override
                             public void onCompleted(final JSONObject object, GraphResponse response) {
                                 try {
-                                    String id = object.getString("id");
+                                    String fid = object.getString("id");
                                     String name = object.getString("first_name");
                                     String surname = object.getString("last_name");
                                     String mail = object.getString("email");
 
                                     realm.beginTransaction();
-                                    user.setID(id);
+                                    user.setFacebookID(fid);
                                     user.setName(name);
                                     user.setSurname(surname);
                                     user.setEmail(mail);
@@ -117,49 +113,48 @@ public class LoginActivity extends Activity {
                 request.setParameters(parameters);
                 request.executeAsync();
 
-                GraphRequestAsyncTask friend_request = new GraphRequest(
-                        loginResult.getAccessToken(),
-                        "/me/friends",
-                        null,
-                        HttpMethod.GET,
-                        new GraphRequest.Callback() {
-                            public void onCompleted(GraphResponse response) {
-                                try {
-                                    JSONArray friendslist = response.getJSONObject().getJSONArray("data");
-                                    ArrayList<String> friends_ids = new ArrayList<String>();
-                                    ArrayList<String> friends_names = new ArrayList<String>();
+                realm.beginTransaction();
+                final RealmList<Friend> realm_friends = new RealmList<>();
+                realm.copyToRealm(realm_friends);
+                realm.commitTransaction();
+
+                GraphRequest friend_request = GraphRequest.newMyFriendsRequest(
+                        AccessToken.getCurrentAccessToken(),
+                        new GraphRequest.GraphJSONArrayCallback() {
+                            @Override
+                            public void onCompleted(JSONArray objects, GraphResponse response) {
+                                Log.i("JSONArray", objects.toString());
+
+                                for (int i = 0; i < objects.length(); i++) {
                                     try {
-                                        for (int f=0; f < friendslist.length(); f++) {
-                                            friends_ids.add(friendslist.getJSONObject(f).getString("id"));
-                                            friends_names.add(friendslist.getJSONObject(f).getString("name"));
-                                        }
+                                        JSONObject friend = objects.getJSONObject(i);
+                                        String id = friend.getString("id");
+                                        String name = friend.getString("first_name");
+                                        String surname = friend.getString("last_name");
+
+                                        realm.beginTransaction();
+                                        Friend realm_friend = realm.createObject(Friend.class);
+                                        realm_friend.setID(id);
+                                        realm_friend.setName(name);
+                                        realm_friend.setSurname(surname);
+                                        realm_friends.add(realm_friend);
+                                        realm.commitTransaction();
+
                                     } catch (JSONException e) {
                                         e.printStackTrace();
                                     }
-
-                                    realm.beginTransaction();
-                                    RealmList<Friend> realm_friends = new RealmList<>();
-                                    realm.copyToRealm(realm_friends);
-
-                                    Friend friend = new Friend();
-
-                                    for(int i=0; i<friends_ids.size(); i++) {
-                                        String id = friends_ids.get(i);
-                                        String name = friends_names.get(i);
-                                        friend.setID(id);
-                                        friend.setName(name);
-                                        realm_friends.add(friend);
-                                        //
-                                    }
-                                    realm.commitTransaction();
-
-                                } catch (JSONException e) {
-                                    e.printStackTrace();
                                 }
+                                realm.beginTransaction();
+                                user.setFriends(realm_friends);
+                                realm.commitTransaction();
                             }
-                        }).executeAsync();
+                        });
+                Bundle param = new Bundle();
+                param.putString("fields", "id, first_name, last_name");
+                friend_request.setParameters(param);
+                friend_request.executeAsync();
 
-                //new HttpRequestTask().execute();
+                new HttpRequestTask().execute();
 
                 Intent i = new Intent(LoginActivity.this, MainActivity.class);
                 startActivity(i);
@@ -192,15 +187,26 @@ public class LoginActivity extends Activity {
         @Override
         protected String doInBackground(Void... params) {
             try {
-                realm = Realm.getDefaultInstance();
-                User user = realm.where(User.class).findFirst();
-
-                final String url = "http://amaca.ga:8080/user?token="+ user.getAuthToken();
+                final String url = "http://amaca.ga:8080"+ authToken;
 
                 RestTemplate restTemplate = new RestTemplate();
                 restTemplate.getMessageConverters().add(new MappingJackson2HttpMessageConverter());
+                restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
 
-                String response = restTemplate.getForObject(url, String.class);
+                realm = Realm.getDefaultInstance();
+                user = realm.createObject(User.class);
+
+                URI target= UriComponentsBuilder.fromUriString(url)
+                        .path("/user")
+                        .queryParam("token", authToken)
+                        .build()
+                        .toUri();
+
+                realm.beginTransaction();
+                user = restTemplate.getForObject(target, User.class);
+                String response = user.toString();
+                user.setRest(response);
+                realm.commitTransaction();
 
                 return response;
 
