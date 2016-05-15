@@ -154,7 +154,7 @@ public class LoginActivity extends Activity {
                 friend_request.setParameters(param);
                 friend_request.executeAsync();
 
-                new HttpRequestTask().execute();
+                //User userFromServer = new LoginSignUp();
 
                 Intent i = new Intent(LoginActivity.this, MainActivity.class);
                 startActivity(i);
@@ -183,49 +183,31 @@ public class LoginActivity extends Activity {
         callbackManager.onActivityResult(requestCode, resultCode, data);
     }
 
-    private class HttpRequestTask extends AsyncTask<Void, Void, String> {
+    private class LoginSignUp extends AsyncTask<User, Void, User> {
         @Override
-        protected String doInBackground(Void... params) {
+        protected User doInBackground(User... params) {
             try {
-                final String url = "http://amaca.ga:8080"+ authToken;
+
+                User user = params[0];
+                Log.d("Rest","GET on /user. Input user for rest call is: "+user.toString());
+
+                final String url = "http://amaca.ga:8080/user?token=" + authToken+
+                        "&facebookId="+user.getFacebookID()+"&name="+user.getName()+
+                        "&surname="+user.getSurname()+"&email="+user.getEmail();
 
                 RestTemplate restTemplate = new RestTemplate();
                 restTemplate.getMessageConverters().add(new MappingJackson2HttpMessageConverter());
-                restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
 
-                realm = Realm.getDefaultInstance();
-                user = realm.createObject(User.class);
-
-                URI target= UriComponentsBuilder.fromUriString(url)
-                        .path("/user")
-                        .queryParam("token", authToken)
-                        .build()
-                        .toUri();
-
-                realm.beginTransaction();
-                user = restTemplate.getForObject(target, User.class);
-                String response = user.toString();
-                user.setRest(response);
-                realm.commitTransaction();
-
-                return response;
+                User userFromServer = restTemplate.getForObject(url, User.class);
+                Log.d("Rest", userFromServer.toString());
+                return userFromServer;
 
             } catch (Exception e) {
-                Log.e("MainActivity", e.getMessage(), e);
+                Log.e("Rest", e.getMessage(), e);
+                return null;
             }
-
-            return null;
         }
 
-        @Override
-        protected void onPostExecute(String rest) {
-            realm = Realm.getDefaultInstance();
-            User user = realm.where(User.class).findFirst();
-
-            realm.beginTransaction();
-            user.setRest(rest);
-            realm.commitTransaction();
-        }
     }
 
 }
