@@ -19,6 +19,8 @@ import com.facebook.login.widget.LoginButton;
 
 import com.smart_team.model.Friend;
 import com.smart_team.model.User;
+import com.smart_team.model.MySelf;
+import com.smart_team.rest.AuthOrSignupUser;
 import com.smart_team.smartteam.R;
 
 import org.json.JSONArray;
@@ -31,6 +33,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Arrays;
 import java.net.URI;
+import java.util.concurrent.ExecutionException;
 
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
@@ -68,48 +71,53 @@ public class LoginActivity extends Activity {
         loginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
 
             @Override
-            public void onSuccess(LoginResult loginResult) {
-
-                Realm.setDefaultConfiguration(new RealmConfiguration.Builder(getApplicationContext()).build());
-
-                // Get a Realm instance for this thread
-                realm = Realm.getDefaultInstance();
-
-                realm.beginTransaction();
-                user = realm.createObject(User.class);
-                realm.copyToRealm(user);
-
-                authToken = loginResult.getAccessToken().getToken();
-
-                user.setAuthToken(authToken);
-                user.setAppID(loginResult.getAccessToken().getApplicationId());
-                realm.commitTransaction();
-
-                GraphRequest request = GraphRequest.newMeRequest(
+            public void onSuccess(final LoginResult loginResult) {
+                final GraphRequest request = GraphRequest.newMeRequest(
                         AccessToken.getCurrentAccessToken(),
                         new GraphRequest.GraphJSONObjectCallback() {
                             @Override
                             public void onCompleted(final JSONObject object, GraphResponse response) {
                                 try {
-                                    String fid = object.getString("id");
+                                    // Data received from server
+                                    String token = loginResult.getAccessToken().getToken();
+                                    String id = object.getString("id");
                                     String name = object.getString("first_name");
                                     String surname = object.getString("last_name");
                                     String mail = object.getString("email");
 
+                                    Log.d("LoginTask", token + " | " + id + " | " + name
+                                            + " | " + surname + " | " + mail);
+
+                                    User requestUser = new User();
+                                    requestUser.setAuthToken(token);
+                                    requestUser.setFacebookID(id);
+                                    requestUser.setName(name);
+                                    requestUser.setSurname(surname);
+                                    requestUser.setEmail(mail);
+
+                                    User responseUser = new AuthOrSignupUser().execute(requestUser).get();
+                                    Log.d("LoginTask","Returned from rest call: "+ responseUser.toString());
                                     realm.beginTransaction();
-                                    user.setFacebookID(fid);
-                                    user.setName(name);
-                                    user.setSurname(surname);
-                                    user.setEmail(mail);
+                                    MySelf myself = realm.createObject(MySelf.class);
+                                    User realmResponseUser = realm.copyToRealm(responseUser);
+                                    myself.setUser(realmResponseUser);
                                     realm.commitTransaction();
 
-                                } catch (JSONException e) {
+                                    // See Singleton implementation of GroupTracking
+
+                                    //Reference to usedId in the WorkflowManager, useful for rest calls
+                                    // WorkflowManager.getWorkflowManager().setMyselfId(responseUser.getUid());
+
+                                } catch (JSONException | InterruptedException | ExecutionException e) {
                                     e.printStackTrace();
                                 }
+                                Intent i = new Intent(LoginActivity.this, MainActivity.class);
+                                startActivity(i);
+                                finish();
                             }
                         });
                 Bundle parameters = new Bundle();
-                parameters.putString("fields", "id, first_name, last_name, picture, email");
+                parameters.putString("fields", "id, first_name, last_name, email");
                 request.setParameters(parameters);
                 request.executeAsync();
 
